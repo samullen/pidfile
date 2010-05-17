@@ -1,0 +1,112 @@
+= BasicDaemon
+
+http://github.com/samullen/basic_daemon
+
+A basic library for creating daemonized processes
+
+This library works with Ruby 1.8, Ruby 1.9, and JRuby and is licensed under the MIT License.
+
+== Installation
+
+The basic_daemon gem is hosted on GemCutter (http://gemcutter.org). This
+requires that you have http://gemcutter.org in your gem sources.
+
+Install the basic_daemon gem: 
+
+  sudo gem install basic_daemon
+
+== Gettings Started
+
+There are currently two ways of using the basic_daemon library: 1) Objected
+Oriented; 2) Functional.
+
+=== Object Oriented 
+
+The basic idea here is to subclass BasicDaemon and overwride the "run" method.
+
+  require 'basic_daemon'
+
+  class MyDaemon < BasicDaemon
+    def run
+      foo = open("/tmp/out", "w")
+
+      i = 1
+
+      while true do
+        foo.puts "loop: #{i}"
+        foo.flush
+        sleep 2
+
+        i += 1
+      end
+    end
+  end
+
+  daemon = MyDaemon.new
+
+  if ARGV[0] == 'start'
+    daemon.start
+  elsif ARGV[0] == 'stop'
+    daemon.stop
+    exit!
+  elsif ARGV[0] == 'restart'
+    daemon.restart
+  else
+    STDERR.puts "Usage: foo_daemon.rb <start|stop|restart>"
+    exit!
+  end
+
+=== Functional
+
+Rather than subclassing BasicDaemon, a block is just passed to the start method.
+
+  require 'basic_daemon'
+
+  daemon = BasicDaemon.new
+
+  process = Proc.new do
+      foo = open("/tmp/out", "w")
+
+      i = 1
+
+      while true do
+        foo.puts "loop: #{i}"
+        foo.flush
+        sleep 2
+
+        i += 1
+      end
+    end
+
+  if ARGV[0] == 'start'
+    daemon.start &process
+  elsif ARGV[0] == 'stop'
+    daemon.stop
+    exit!
+  elsif ARGV[0] == 'restart'
+    daemon.restart &process
+  else
+    STDERR.puts "Usage: foo_daemon.rb <start|stop|restart>"
+    exit!
+  end
+
+=== Arguments
+
+BasicDaemon creates file to store the process ID (PID). By default, this file
+is given the same name as the calling script sans the file extension and is
+stored in the /tmp directory. Also by default, the directory the calling script
+is working in is changed to the root directory ('/').
+
+Each argument, :pidfile, :piddir, :workingdir, can be changed upon
+instantiation of the class. 
+
+==== Example:
+
+Most Linux users will want to instantiate thusly:
+
+  BasicDaemon.new(:piddir => '/var/lock')
+
+== Copyright
+
+Copyright(c) 2009 Samuel Mullen (samullen). See LICENSE for details
+
