@@ -1,11 +1,11 @@
 class PidFile
-  attr_accessor
+  attr_accessor :pidfile, :piddir
 
   VERSION = '0.0.1'
 
   DEFAULT_OPTIONS = {
-    :pidfile => File.basename($PROGRAM_NAME, File.extname($PROGRAM_NAME)),
-    :piddir => '/var/run',
+    :pidfile => File.basename($0, File.extname($0)) + ".pid",
+    :piddir => '/tmp',
   }
 
   def initialize(*args)
