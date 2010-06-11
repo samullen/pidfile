@@ -1,7 +1,7 @@
 class PidFile
   attr_accessor :pidfile, :piddir
 
-  VERSION = '0.0.1'
+  VERSION = '0.1.0'
 
   DEFAULT_OPTIONS = {
     :pidfile => File.basename($0, File.extname($0)) + ".pid",
@@ -27,8 +27,11 @@ class PidFile
 
     @piddir     = opts[:piddir]
     @pidfile    = opts[:pidfile]
+    @fh         = nil
 
     create_pidfile
+
+    at_exit { release }
   end
 
   # Returns the fullpath to the file containing the process ID (PID)
@@ -36,96 +39,84 @@ class PidFile
     File.join(@piddir, @pidfile)
   end
 
-  # Returns the PID of the currently running process
+  # Returns the PID, if any, of the currently running process
   def pid
     return @pid unless @pid.nil?
 
-    begin
+    if self.pidfile_exists?
       @pid = open(self.pidpath, 'r').read.to_i
-    rescue Errno::EACCES => e
-      STDERR.puts "Error: unable to open file #{self.pidpath} for reading:\n\t"+
-        "(#{e.class}) #{e.message}"
-      exit!
-    rescue => e
+    else
+      @pid = nil
     end
-
-    @pid
   end
 
-#----- needs to be a class instance method too -----#
-  def running?
-  end
-
+  # Boolean stating whether this process is alive and running
   def alive?
-    begin
-      Process.kill(0, self.pid)
-      true
-    rescue Errno::ESRCH, TypeError # "PID is NOT running or is zombied
-      false
-    rescue Errno::EPERM
-      STDERR.puts "No permission to query #{pid}!";
-    rescue => e
-      STDERR.puts "(#{e.class}) #{e.message}:\n\t" <<
-        "Unable to determine status for #{pid}."
-    end
+    return false unless self.pid && (self.pid == Process.pid)
+
+    self.class.process_exists?(self.pid)
   end
 
-  def exists?
-    File.exists? pidpath
+  # does the pidfile exist?
+  def pidfile_exists?
+    self.class.pidfile_exists?(pidpath)
   end
 
   def release
-  end
-
-  def terminate
-    unless self.pid
-      STDERR.puts "pidfile #{self.pidpath} does not exist. Daemon not running?\n"
-      return # not an error in a restart
+    unless @fh.nil?
+      @fh.flock(File::LOCK_UN)
+      remove_pidfile
     end
-
-    begin
-      while true do
-        Process.kill("TERM", self.pid)
-        sleep(0.1)
-      end
-    rescue Errno::ESRCH # gets here when there is no longer a process to kill
-    rescue => e
-      STDERR.puts "unable to terminate process: (#{e.class}) #{e.message}"
-      exit!
-    end
+    @pid = nil
   end
 
   def locktime
     File.mtime(self.pidpath)
   end
 
-# can I add an END block here?
+  # class method for determining the existence of pidfile
+  def self.pidfile_exists?(path=nil)
+    path ||= File.join(DEFAULT_OPTIONS[:piddir], DEFAULT_OPTIONS[:pidfile])
+
+    File.exists?(path)
+  end
+
+  # boolean stating whether the calling process is already running
+  def self.running?(path=nil)
+    path ||= File.join(DEFAULT_OPTIONS[:piddir], DEFAULT_OPTIONS[:pidfile])
+
+    if pidfile_exists?(path)
+      pid = open(path, 'r').read.to_i
+    else
+      pid = nil
+    end
+
+    return false unless pid && (pid != Process.pid)
+
+    process_exists?(pid)
+  end
 
 private
 
   # Writes the process ID to the pidfile and defines @pid as such
   def create_pidfile
-    begin
-      open(self.pidpath, "w") do |f|
-        @pid = Process.pid
-        f.puts @pid
-      end
-    rescue => e
-      STDERR.puts "Error: Unable to open #{self.pidpath} for writing:\n\t" +
-        "(#{e.class}) #{e.message}"
-      exit!
-    end
+    @fh = open(self.pidpath, "w")
+    @fh.flock(File::LOCK_EX | File::LOCK_NB) || raise
+    @pid = Process.pid
+    @fh.puts @pid
   end
 
   # removes the pidfile. 
   def remove_pidfile
-    begin
-      File.unlink(self.pidpath)
-    rescue => e
-      STDERR.puts "ERROR: Unable to unlink #{self.pidpath}:\n\t" +
-        "(#{e.class}) #{e.message}"
-      exit
-    end
+    File.unlink(self.pidpath) if self.pidfile_exists?
   end
 
+  def self.process_exists?(process_id)
+    begin
+      Process.kill(0, process_id)
+      true
+    rescue Errno::ESRCH, TypeError # "PID is NOT running or is zombied
+      false
+    end
+  end
 end
