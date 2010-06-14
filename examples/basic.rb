@@ -2,7 +2,8 @@
 
 require File.join(File.dirname(__FILE__), '..', 'lib','pidfile')
 
-p = PidFile.new unless PidFile.running?
+PidFile.new unless PidFile.running?
+PidFile.new
 
 puts p.pidfile
 puts p.piddir

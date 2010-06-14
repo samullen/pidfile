@@ -1,7 +1,7 @@
 class PidFile
   attr_accessor :pidfile, :piddir
 
-  VERSION = '0.1.0'
+  VERSION = '0.2.0'
 
   DEFAULT_OPTIONS = {
     :pidfile => File.basename($0, File.extname($0)) + ".pid",
@@ -39,7 +39,7 @@ class PidFile
     File.join(@piddir, @pidfile)
   end
 
-  # Returns the PID, if any, of the currently running process
+  # Returns the PID, if any, of the instantiating process
   def pid
     return @pid unless @pid.nil?
 
@@ -62,6 +62,7 @@ class PidFile
     self.class.pidfile_exists?(pidpath)
   end
 
+  # unlock and remove the pidfile. Sets pid to nil
   def release
     unless @fh.nil?
       @fh.flock(File::LOCK_UN)
@@ -70,6 +71,7 @@ class PidFile
     @pid = nil
   end
 
+  # returns the modification time of the pidfile
   def locktime
     File.mtime(self.pidpath)
   end
@@ -81,7 +83,7 @@ class PidFile
     File.exists?(path)
   end
 
-  # boolean stating whether the calling process is already running
+  # boolean stating whether the calling program is already running
   def self.running?(path=nil)
     path ||= File.join(DEFAULT_OPTIONS[:piddir], DEFAULT_OPTIONS[:pidfile])
 

@@ -58,7 +58,7 @@ describe PidFile do
     PidFile.running?('/tmp/foo.pid').should be_false
   end
 
-  it "running? should default to certain values" do
+  it "is running? should default to certain values" do
     pf = PidFile.new
     PidFile.running?.should be_true
     pf.release
