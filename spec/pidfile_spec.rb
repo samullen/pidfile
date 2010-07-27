@@ -1,17 +1,6 @@
 require File.join(File.dirname(__FILE__), '..', 'lib','pidfile')
 
 describe PidFile do
-  before(:all) do
-#     basedir        = File.dirname(__FILE__)
-#     @example_files = Hash.new
-# 
-#     @example_files[:halloween] = File.join(basedir, "files/halloween2009.puz")
-#     @example_files[:crnet]     = File.join(basedir, "files/crnet100306.puz")
-#     @example_files[:tmcal]     = File.join(basedir, "files/tmcal100306.puz")
-#     @example_files[:xp]        = File.join(basedir, "files/xp100306.puz")
-#     @example_files[:ydx]       = File.join(basedir, "files/ydx100515.puz")
-  end
-
   before(:each) do
     @pidfile = PidFile.new(:pidfile => "rspec.pid")
   end
@@ -30,6 +19,18 @@ describe PidFile do
     @pidfile.pidpath.should == "/tmp/rspec.pid"
   end
 
+  it "should secure pidfiles left behind and recycle them for itself" do
+    @pidfile.release
+    fakepid = 99999999 # absurd number
+    open("/tmp/foo.pid", "w") {|f| f.puts fakepid }
+    pf = PidFile.new(:pidfile => "foo.pid")
+    PidFile.pid(pf.pidpath).should == Process.pid
+    pf.should be_an_instance_of PidFile
+    pf.pid.should_not == fakepid
+    pf.pid.should be_a_kind_of Integer
+    pf.release
+  end
+
   it "should create a pid file upon instantiation" do
     File.exists?(@pidfile.pidpath).should be_true
   end
@@ -38,34 +39,40 @@ describe PidFile do
     @pidfile.pid.should == Process.pid
   end
 
-  it "should determine if pidfile exists or not" do
+  it "should know if pidfile exists or not" do
     @pidfile.pidfile_exists?.should be_true
+    @pidfile.release
+    @pidfile.pidfile_exists?.should be_false
   end
 
   it "should be able to tell if a process is running" do
     @pidfile.alive?.should be_true
   end
 
-#   it "should remove the pidfile when the calling application exits" do
-#   end
+  it "should remove the pidfile when the calling application exits" do
+    fork do
+      exit
+    end
+    PidFile.pidfile_exists?.should be_false
+  end
 
   it "should raise an error if a pidfile already exists" do
     lambda { PidFile.new(:pidfile => "rspec.pid") }.should raise_error
   end
 
-  it "should determine if a process exists or not" do
+  it "should know if a process exists or not - Class method" do
     PidFile.running?('/tmp/rspec.pid').should be_true
     PidFile.running?('/tmp/foo.pid').should be_false
   end
 
-  it "is running? should default to certain values" do
+  it "should know if it is running - Class method" do
     pf = PidFile.new
     PidFile.running?.should be_true
     pf.release
     PidFile.running?.should be_false
   end
 
-  it "should deterimine if it's alive or not" do
+  it "should know if it's alive or not" do
     @pidfile.alive?.should be_true
     @pidfile.release
     @pidfile.alive?.should be_false

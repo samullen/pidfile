@@ -17,14 +17,13 @@ Install the pidfile gem:
 
 == Gettings Started
 
-The pidfile gem is easy to use and only requires the addition of a single line 
-of code; something like this:
+The pidfile gem is easy to use and only requires the instantiation of the
+pidfile, like so:
 
-  pf = PidFile.new unless PidFile.running?
+  pf = PidFile.new
 
 Of course there is other functionality, but if you are just wanting to keep a
 process from running more than once, this is all you need.
-
 
 === Arguments
 
@@ -39,6 +38,18 @@ class.
 ==== Example:
 
   PidFile.new(:piddir => '/var/lock', :pidfile => "awesome.pid")
+
+== Miscellaneous
+
+=== Why isn't this a singleton?
+
+My main concern is how it would behave when a process is forked multiple times.
+Each new process would get its own PID, but I wasn't sure how using a singleton
+would affect this; if the interrelationship of the processes would keep the
+object from correctly identifying the correct pidfile. 
+
+Anyway, I like the flexibility that not using a singleton offers, and I guess
+I'd rather ask you not to do something bad rather than restraining you.
 
 == Copyright
 

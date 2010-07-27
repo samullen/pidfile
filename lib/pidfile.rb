@@ -1,7 +1,9 @@
 class PidFile
-  attr_accessor :pidfile, :piddir
+  attr_reader :pidfile, :piddir, :pidpath
 
-  VERSION = '0.2.0'
+  class DuplicateProcessError < RuntimeError; end
+
+  VERSION = '0.3.0'
 
   DEFAULT_OPTIONS = {
     :pidfile => File.basename($0, File.extname($0)) + ".pid",
@@ -11,6 +13,7 @@ class PidFile
   def initialize(*args)
     opts = {}
 
+    #----- set options -----#
     case
     when args.length == 0 then
     when args.length == 1 && args[0].class == Hash then
@@ -27,17 +30,29 @@ class PidFile
 
     @piddir     = opts[:piddir]
     @pidfile    = opts[:pidfile]
+    @pidpath    = File.join(@piddir, @pidfile)
     @fh         = nil
 
+    #----- Does the pidfile or pid exist? -----#
+    if self.pidfile_exists?
+      if self.class.running?(@pidpath)
+        raise DuplicateProcessError, "Process (#{$0} - #{self.class.pid(@pidpath)}) is already running."
+        
+        exit! # exit without removing the existing pidfile
+      end
+
+      self.release
+    end
+
+    #----- create the pidfile -----#
     create_pidfile
 
     at_exit { release }
   end
 
-  # Returns the fullpath to the file containing the process ID (PID)
-  def pidpath
-    File.join(@piddir, @pidfile)
-  end
+  #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=#
+  # Instance Methods
+  #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=#
 
   # Returns the PID, if any, of the instantiating process
   def pid
@@ -76,6 +91,17 @@ class PidFile
     File.mtime(self.pidpath)
   end
 
+  #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=#
+  # Class Methods
+  #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=#
+
+  # Returns the PID, if any, of the instantiating process
+  def self.pid(path=nil)
+    if pidfile_exists?(path)
+      open(path, 'r').read.to_i
+    end
+  end
+
   # class method for determining the existence of pidfile
   def self.pidfile_exists?(path=nil)
     path ||= File.join(DEFAULT_OPTIONS[:piddir], DEFAULT_OPTIONS[:pidfile])
@@ -85,30 +111,30 @@ class PidFile
 
   # boolean stating whether the calling program is already running
   def self.running?(path=nil)
+    calling_pid = nil
     path ||= File.join(DEFAULT_OPTIONS[:piddir], DEFAULT_OPTIONS[:pidfile])
 
     if pidfile_exists?(path)
-      pid = open(path, 'r').read.to_i
-    else
-      pid = nil
+      calling_pid = pid(path)
     end
 
-    return false unless pid && (pid != Process.pid)
-
-    process_exists?(pid)
+    process_exists?(calling_pid)
   end
 
 private
 
   # Writes the process ID to the pidfile and defines @pid as such
   def create_pidfile
+    # Once the filehandle is created, we don't release until the process dies.
     @fh = open(self.pidpath, "w")
     @fh.flock(File::LOCK_EX | File::LOCK_NB) || raise
     @pid = Process.pid
     @fh.puts @pid
+    @fh.flush
+    @fh.rewind
   end
 
-  # removes the pidfile. 
+  # removes the pidfile.
   def remove_pidfile
     File.unlink(self.pidpath) if self.pidfile_exists?
   end
