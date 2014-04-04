@@ -7,7 +7,7 @@ class PidFile
 
   DEFAULT_OPTIONS = {
     :pidfile => File.basename($0, File.extname($0)) + ".pid",
-    :piddir => '/tmp',
+    :piddir => '/var/run',
   }
 
   def initialize(*args)
