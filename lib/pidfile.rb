@@ -95,8 +95,14 @@ class PidFile
   # Class Methods
   #-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=#
 
+  # Return the default pidfile path
+  def self.default_pidfile
+    File.join(DEFAULT_OPTIONS[:piddir], DEFAULT_OPTIONS[:pidfile])
+  end
+
   # Returns the PID, if any, of the instantiating process
   def self.pid(path=nil)
+    path ||= default_pidfile
     if pidfile_exists?(path)
       open(path, 'r').read.to_i
     end
@@ -104,7 +110,7 @@ class PidFile
 
   # class method for determining the existence of pidfile
   def self.pidfile_exists?(path=nil)
-    path ||= File.join(DEFAULT_OPTIONS[:piddir], DEFAULT_OPTIONS[:pidfile])
+    path ||= default_pidfile
 
     File.exists?(path)
   end
@@ -112,7 +118,7 @@ class PidFile
   # boolean stating whether the calling program is already running
   def self.running?(path=nil)
     calling_pid = nil
-    path ||= File.join(DEFAULT_OPTIONS[:piddir], DEFAULT_OPTIONS[:pidfile])
+    path ||= default_pidfile
 
     if pidfile_exists?(path)
       calling_pid = pid(path)
